@@ -1137,7 +1137,6 @@
             customBusinesses: 'afripay_custom_businesses',
             user: 'afripay_user',
             lang: 'afripay_lang',
-            // Online status tracking
             onlineStatus: 'afripay_online_status'
         };
 
@@ -1152,6 +1151,7 @@
         let allBusinesses = [];
         let isDark = false;
         let onlineStatusMap = {};
+        let registrationListenerActive = false;
 
         // ============================================================
         // DOM REFS
@@ -1172,7 +1172,7 @@
         }
 
         // ============================================================
-        // ONLINE STATUS MANAGEMENT (shared via localStorage)
+        // ONLINE STATUS MANAGEMENT
         // ============================================================
         function loadOnlineStatus() {
             try {
@@ -1187,41 +1187,15 @@
             } catch (e) {}
         }
 
-        // Mark a user as online (called by the main app / agent hub)
-        // In this dashboard we simulate by checking if the user was active recently
-        // The actual online status is set by the main app (AfriPay Agent Hub)
-        // We read it from localStorage and display accordingly.
-
-        // This function is called from the main app to update status
-        function setUserOnline(userId, isOnline) {
-            if (!userId) return;
-            if (isOnline) {
-                onlineStatusMap[userId] = {
-                    online: true,
-                    lastSeen: Date.now()
-                };
-            } else {
-                if (onlineStatusMap[userId]) {
-                    onlineStatusMap[userId].online = false;
-                    onlineStatusMap[userId].lastSeen = Date.now();
-                }
-            }
-            saveOnlineStatus();
-        }
-
         function isUserOnline(userId) {
             if (!userId) return false;
             const entry = onlineStatusMap[userId];
             if (!entry) return false;
-            // If online, check if lastSeen is within 2 minutes (120000ms)
-            // If offline, return false
             if (entry.online) {
                 const now = Date.now();
-                // Consider online if lastSeen within 2 minutes
                 if (now - entry.lastSeen < 120000) {
                     return true;
                 } else {
-                    // Auto-offline if stale
                     entry.online = false;
                     saveOnlineStatus();
                     return false;
@@ -1252,7 +1226,6 @@
             try {
                 const raw = localStorage.getItem(KEYS.customBusinesses);
                 const custom = raw ? JSON.parse(raw) : [];
-                // Merge with built-in businesses from main app
                 const builtIn = [
                     { id: 1, name: "Mama's Kitchen", type: "Restaurant", icon: "🍽️", goods: [] },
                     { id: 2, name: "Freetown Computer Hub", type: "Electronics", icon: "💻", goods: [] },
@@ -1267,17 +1240,13 @@
                 allBusinesses = [...builtIn, ...custom];
             } catch (e) { allBusinesses = []; }
 
-            // Agents are users with isAgent === true or role === 'agent'
             allAgents = allUsers.filter(u => u.isAgent === true || u.role === 'agent');
 
-            // Update pending badge
             const badge = $('pendingBadge');
             if (badge) badge.textContent = pendingBusinesses.length;
 
-            // Load online status
             loadOnlineStatus();
 
-            // Auto-update stale online status
             for (const userId in onlineStatusMap) {
                 if (onlineStatusMap[userId].online) {
                     const now = Date.now();
@@ -1297,7 +1266,7 @@
         }
 
         // ============================================================
-        // ADMIN AUTH (auto-login)
+        // ADMIN AUTH
         // ============================================================
         function ensureAdmin() {
             let admin = getAdmin();
@@ -1406,7 +1375,6 @@
                         </tr>`;
             }).join('');
 
-            // Event listeners
             tbody.querySelectorAll('.btn-approve').forEach(btn => {
                 btn.addEventListener('click', () => approveAgent(btn.dataset.id));
             });
@@ -1607,7 +1575,6 @@
                         </tr>`;
             }).join('');
 
-            // Dash pending approvals
             const pbody = $('dashPendingApprovals');
             if (!pbody) return;
             if (pendingBusinesses.length === 0) {
@@ -1656,7 +1623,6 @@
                 `Are you sure you want to remove <strong>${esc(agent.businessName || agent.name)}</strong>? This action cannot be undone.`,
                 () => {
                     allUsers = allUsers.filter(u => u.id !== id);
-                    // Remove from online status as well
                     delete onlineStatusMap[id];
                     saveOnlineStatus();
                     saveData();
@@ -1955,6 +1921,125 @@
         }
 
         // ============================================================
+        // CROSS-DEVICE REGISTRATION CAPTURE
+        // ============================================================
+        function setupCrossDeviceListener() {
+            // Listen for storage events from other tabs/devices
+            window.addEventListener('storage', function(e) {
+                // Check if the change is related to user registrations
+                if (e.key === KEYS.registeredUsers || e.key === KEYS.transactions ||
+                    e.key === KEYS.pendingBusinesses || e.key === KEYS.customBusinesses ||
+                    e.key === KEYS.onlineStatus) {
+
+                    // Capture the previous state for comparison
+                    const oldUsers = JSON.stringify(allUsers);
+                    const oldTx = JSON.stringify(allTransactions);
+                    const oldPending = JSON.stringify(pendingBusinesses);
+                    const oldStatus = JSON.stringify(onlineStatusMap);
+
+                    // Reload data
+                    loadData();
+
+                    const newUsers = JSON.stringify(allUsers);
+                    const newTx = JSON.stringify(allTransactions);
+                    const newPending = JSON.stringify(pendingBusinesses);
+                    const newStatus = JSON.stringify(onlineStatusMap);
+
+                    // Check if there was a new user or agent registration
+                    if (oldUsers !== newUsers) {
+                        const addedUsers = allUsers.filter(u => {
+                            // Check if this user is new (not in old state)
+                            const oldUserList = JSON.parse(oldUsers || '[]');
+                            return !oldUserList.some(o => o.id === u.id && o.name === u.name);
+                        });
+                        if (addedUsers.length > 0) {
+                            const names = addedUsers.map(u => u.businessName || u.name).join(', ');
+                            showToast(`🆕 New registration(s): ${names}`, 4000);
+                        }
+                    }
+
+                    // Update the active page
+                    const active = document.querySelector('.page-section.active');
+                    if (active) {
+                        const id = active.id.replace('page-', '');
+                        if (id === 'dashboard') { renderStats();
+                            renderDashRecent(); }
+                        if (id === 'agents') renderAgents();
+                        if (id === 'users') renderUsers();
+                        if (id === 'transactions') renderTransactions();
+                        if (id === 'pending') renderPending();
+                        if (id === 'businesses') renderBusinesses();
+                    }
+
+                    // If there was any change, show a general sync notification (but don't spam)
+                    if (oldUsers !== newUsers || oldTx !== newTx || oldPending !== newPending || oldStatus !== newStatus) {
+                        // Only show if it wasn't a registration notification already
+                        if (oldUsers === newUsers) {
+                            showToast('🔄 Data synced from another device', 1500);
+                        }
+                    }
+                }
+            });
+
+            // Also poll for updates every 3 seconds to catch changes from other devices
+            // that might not trigger the storage event (e.g., if the other tab is using a different storage key)
+            let lastKnownState = {
+                users: JSON.stringify(allUsers),
+                tx: JSON.stringify(allTransactions),
+                pending: JSON.stringify(pendingBusinesses),
+                status: JSON.stringify(onlineStatusMap)
+            };
+
+            setInterval(() => {
+                // Check for updates
+                const currentUsers = JSON.stringify(allUsers);
+                const currentTx = JSON.stringify(allTransactions);
+                const currentPending = JSON.stringify(pendingBusinesses);
+                const currentStatus = JSON.stringify(onlineStatusMap);
+
+                if (currentUsers !== lastKnownState.users ||
+                    currentTx !== lastKnownState.tx ||
+                    currentPending !== lastKnownState.pending ||
+                    currentStatus !== lastKnownState.status) {
+
+                    // Check if this was a new registration
+                    if (currentUsers !== lastKnownState.users) {
+                        const oldUserList = JSON.parse(lastKnownState.users || '[]');
+                        const newUserList = JSON.parse(currentUsers || '[]');
+                        const addedUsers = newUserList.filter(u => {
+                            return !oldUserList.some(o => o.id === u.id && o.name === u.name);
+                        });
+                        if (addedUsers.length > 0) {
+                            const names = addedUsers.map(u => u.businessName || u.name).join(', ');
+                            showToast(`🆕 New registration(s): ${names}`, 4000);
+                        }
+                    }
+
+                    // Update the state
+                    lastKnownState = {
+                        users: currentUsers,
+                        tx: currentTx,
+                        pending: currentPending,
+                        status: currentStatus
+                    };
+
+                    // Refresh the active page
+                    const active = document.querySelector('.page-section.active');
+                    if (active) {
+                        const id = active.id.replace('page-', '');
+                        if (id === 'dashboard') { renderStats();
+                            renderDashRecent(); }
+                        if (id === 'agents') renderAgents();
+                        if (id === 'users') renderUsers();
+                        if (id === 'transactions') renderTransactions();
+                        if (id === 'pending') renderPending();
+                        if (id === 'businesses') renderBusinesses();
+                    }
+                }
+            }, 3000);
+        }
+
+        // ============================================================
         // INIT
         // ============================================================
         function initApp() {
@@ -1970,57 +2055,10 @@
             navigateTo('dashboard');
             bindEvents();
 
-            // Listen for storage changes from other tabs/devices
-            window.addEventListener('storage', function(e) {
-                if (e.key === KEYS.registeredUsers || e.key === KEYS.transactions ||
-                    e.key === KEYS.pendingBusinesses || e.key === KEYS.customBusinesses ||
-                    e.key === KEYS.onlineStatus) {
-                    loadData();
-                    const active = document.querySelector('.page-section.active');
-                    if (active) {
-                        const id = active.id.replace('page-', '');
-                        if (id === 'dashboard') { renderStats();
-                            renderDashRecent(); }
-                        if (id === 'agents') renderAgents();
-                        if (id === 'users') renderUsers();
-                        if (id === 'transactions') renderTransactions();
-                        if (id === 'pending') renderPending();
-                        if (id === 'businesses') renderBusinesses();
-                    }
-                    showToast('🔄 Data synced from another device/tab', 1500);
-                }
-            });
+            // Setup cross-device registration listener
+            setupCrossDeviceListener();
 
-            // Also poll for updates every 10 seconds to catch changes from other devices
-            setInterval(() => {
-                const oldUsers = JSON.stringify(allUsers);
-                const oldTx = JSON.stringify(allTransactions);
-                const oldPending = JSON.stringify(pendingBusinesses);
-                const oldStatus = JSON.stringify(onlineStatusMap);
-
-                loadData();
-
-                const newUsers = JSON.stringify(allUsers);
-                const newTx = JSON.stringify(allTransactions);
-                const newPending = JSON.stringify(pendingBusinesses);
-                const newStatus = JSON.stringify(onlineStatusMap);
-
-                if (oldUsers !== newUsers || oldTx !== newTx || oldPending !== newPending || oldStatus !== newStatus) {
-                    const active = document.querySelector('.page-section.active');
-                    if (active) {
-                        const id = active.id.replace('page-', '');
-                        if (id === 'dashboard') { renderStats();
-                            renderDashRecent(); }
-                        if (id === 'agents') renderAgents();
-                        if (id === 'users') renderUsers();
-                        if (id === 'transactions') renderTransactions();
-                        if (id === 'pending') renderPending();
-                        if (id === 'businesses') renderBusinesses();
-                    }
-                }
-            }, 10000);
-
-            console.log('✅ AfriPay Admin Dashboard ready (cross-device sync enabled).');
+            console.log('✅ AfriPay Admin Dashboard ready (real-time cross-device registration capture enabled).');
         }
 
         // ============================================================
