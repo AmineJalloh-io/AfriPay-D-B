@@ -86,7 +86,7 @@
             background: white;
             border-radius: var(--radius);
             padding: 2rem 2rem 2.2rem;
-            max-width: 400px;
+            max-width: 420px;
             width: 100%;
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
         }
@@ -180,6 +180,40 @@
             text-align: center;
             margin-bottom: 0.6rem;
             min-height: 1.4rem;
+        }
+        .tab-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 1.2rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .tab-row .tab-btn {
+            flex: 1;
+            padding: 8px 0;
+            background: transparent;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: var(--transition);
+        }
+        .tab-row .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-row .tab-btn:hover {
+            color: var(--text-primary);
+        }
+        .form-panel {
+            display: none;
+        }
+        .form-panel.active {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* ============================================================
@@ -953,7 +987,15 @@
             </div>
             <div id="loginAuthError" class="auth-error"></div>
             <div id="loginAuthSuccess" class="auth-success"></div>
-            <div id="loginFields">
+
+            <!-- Tabs -->
+            <div class="tab-row">
+                <button class="tab-btn" data-tab="loginTab">Login</button>
+                <button class="tab-btn active" data-tab="registerTab">Register</button>
+            </div>
+
+            <!-- Login Panel -->
+            <div class="form-panel" id="loginTab">
                 <div class="input-group">
                     <label>Admin Name</label>
                     <input type="text" id="loginName" placeholder="Enter admin name" />
@@ -962,16 +1004,15 @@
                     <label>Password</label>
                     <input type="password" id="loginPassword" placeholder="Enter password" />
                 </div>
-                <div class="input-group" id="loginPinGroup" style="display:none;">
+                <div class="input-group">
                     <label>5-Digit PIN</label>
                     <input type="password" id="loginPin" placeholder="Enter 5-digit PIN" maxlength="5" inputmode="numeric" />
                 </div>
                 <button class="login-btn" id="loginActionBtn">Login</button>
-                <div class="auth-toggle">
-                    <span id="authToggleText">Don't have an account? <a id="authToggleLink">Register</a></span>
-                </div>
             </div>
-            <div id="registerFields" style="display:none;">
+
+            <!-- Register Panel -->
+            <div class="form-panel active" id="registerTab">
                 <div class="input-group">
                     <label>Admin Name *</label>
                     <input type="text" id="regName" placeholder="Choose a name" />
@@ -988,9 +1029,9 @@
                     <label>5-Digit PIN *</label>
                     <input type="password" id="regPin" placeholder="Enter 5-digit PIN" maxlength="5" inputmode="numeric" />
                 </div>
-                <button class="login-btn" id="registerActionBtn">Register</button>
-                <div class="auth-toggle">
-                    <span>Already have an account? <a id="authToggleLinkBack">Login</a></span>
+                <button class="login-btn" id="registerActionBtn">Register Admin</button>
+                <div style="text-align:center;margin-top:8px;font-size:0.75rem;color:var(--text-secondary);">
+                    <i class="fas fa-info-circle"></i> No admin account yet? Register now.
                 </div>
             </div>
         </div>
@@ -2058,25 +2099,6 @@
         // ============================================================
         // AUTH UI
         // ============================================================
-        function showLogin() {
-            $('loginFields').style.display = 'block';
-            $('registerFields').style.display = 'none';
-            $('loginPinGroup').style.display = 'block';
-            $('authToggleText').innerHTML = `Don't have an account? <a id="authToggleLink">Register</a>`;
-            $('loginActionBtn').textContent = 'Login';
-            $('loginAuthError').textContent = '';
-            $('loginAuthSuccess').textContent = '';
-            document.getElementById('authToggleLink')?.addEventListener('click', showRegister);
-        }
-
-        function showRegister() {
-            $('loginFields').style.display = 'none';
-            $('registerFields').style.display = 'block';
-            $('loginAuthError').textContent = '';
-            $('loginAuthSuccess').textContent = '';
-            document.getElementById('authToggleLinkBack')?.addEventListener('click', showLogin);
-        }
-
         function showApp() {
             $('loginScreen').style.display = 'none';
             $('app').style.display = 'flex';
@@ -2098,31 +2120,52 @@
             currentAdmin = null;
             $('app').style.display = 'none';
             $('loginScreen').style.display = 'flex';
-            showLogin();
+            // Switch to register tab by default
+            switchTab('registerTab');
             showToast('Logged out.', 1500);
+        }
+
+        // ============================================================
+        // TAB SWITCHING
+        // ============================================================
+        function switchTab(tabId) {
+            $$('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.tab-btn[data-tab="${tabId}"]`)?.classList.add('active');
+            $$('.form-panel').forEach(p => p.classList.remove('active'));
+            const panel = $(tabId);
+            if (panel) panel.classList.add('active');
+            // Clear errors
+            $('loginAuthError').textContent = '';
+            $('loginAuthSuccess').textContent = '';
         }
 
         // ============================================================
         // INIT AUTH
         // ============================================================
         function initAuth() {
-            if (isAdminLoggedIn()) {
-                const admin = getAdmin();
-                if (admin) {
-                    currentAdmin = admin;
-                    showApp();
-                    return;
-                } else {
-                    setAdminLoggedIn(false);
-                }
+            // If admin exists and is logged in, go to app
+            if (isAdminLoggedIn() && getAdmin()) {
+                showApp();
+                return;
             }
-            showLogin();
+            // Otherwise show login screen with register tab active
+            $('loginScreen').style.display = 'flex';
+            $('app').style.display = 'none';
+            switchTab('registerTab');
         }
 
         // ============================================================
         // EVENT BINDING
         // ============================================================
         function bindEvents() {
+            // Tab switching
+            $$('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tab = btn.dataset.tab;
+                    if (tab) switchTab(tab);
+                });
+            });
+
             // Login
             $('loginActionBtn').addEventListener('click', () => {
                 const name = $('loginName').value.trim();
@@ -2149,22 +2192,27 @@
                 if (registerAdmin(name, password, confirm, pin)) {
                     $('loginAuthError').textContent = '';
                     $('loginAuthSuccess').textContent = '✅ Admin registered! Please login.';
-                    setTimeout(() => { showLogin();
-                        $('loginAuthSuccess').textContent = ''; }, 1200);
+                    // Switch to login tab after short delay
+                    setTimeout(() => {
+                        switchTab('loginTab');
+                        $('loginAuthSuccess').textContent = '';
+                    }, 1500);
                 } else {
                     $('loginAuthError').textContent = '❌ Registration failed.';
                 }
             });
 
-            // Enter key
-            $('loginName').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginActionBtn').click(); });
-            $('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginActionBtn').click(); });
-            $('loginPin').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginActionBtn').click(); });
-            $('regName').addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn').click(); });
-            $('regPassword').addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn').click(); });
-            $('regConfirmPassword').addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn')
-                    .click(); });
-            $('regPin').addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn').click(); });
+            // Enter key support
+            const loginFields = ['loginName', 'loginPassword', 'loginPin'];
+            loginFields.forEach(id => {
+                $(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') $('loginActionBtn')
+                        .click(); });
+            });
+            const regFields = ['regName', 'regPassword', 'regConfirmPassword', 'regPin'];
+            regFields.forEach(id => {
+                $(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn')
+                        .click(); });
+            });
 
             // Sidebar nav
             $$('.nav-item').forEach(item => {
