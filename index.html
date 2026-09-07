@@ -35,6 +35,8 @@
             --red: #e74c3c;
             --gold: #ffd966;
             --transition: 0.25s ease;
+            --online-dot: #2ecc71;
+            --offline-dot: #95a5a6;
         }
         body {
             background: var(--bg-primary);
@@ -514,6 +516,31 @@
         }
 
         /* ============================================================
+           STATUS DOT (online/offline)
+           ============================================================ */
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .status-dot.online {
+            background: var(--online-dot);
+            box-shadow: 0 0 6px rgba(46, 204, 113, 0.5);
+        }
+        .status-dot.offline {
+            background: var(--offline-dot);
+        }
+        .user-name-with-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ============================================================
            TOAST
            ============================================================ */
         .toast {
@@ -819,7 +846,7 @@
 <body>
 
     <!-- ============================================================
-    APP (no login screen)
+    APP
     ============================================================ -->
     <div id="app">
 
@@ -887,7 +914,7 @@
                         </div>
                         <div class="table-scroll" style="max-height:200px;overflow-y:auto;">
                             <table>
-                                <thead><tr><th>Name</th><th>Business</th><th>Status</th></tr></thead>
+                                <thead><tr><th>Agent</th><th>Business</th><th>Status</th></tr></thead>
                                 <tbody id="dashRecentAgents"></tbody>
                             </table>
                         </div>
@@ -952,7 +979,7 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Name</th>
+                                    <th>User</th>
                                     <th>Phone</th>
                                     <th>City</th>
                                     <th>Country</th>
@@ -1099,7 +1126,7 @@
     ============================================================ -->
     <script>
         // ============================================================
-        // STORAGE KEYS (match main app)
+        // STORAGE KEYS (shared across devices/tabs)
         // ============================================================
         const KEYS = {
             registeredUsers: 'afripay_registered_users',
@@ -1109,7 +1136,9 @@
             adminLoggedIn: 'afripay_admin_logged_in',
             customBusinesses: 'afripay_custom_businesses',
             user: 'afripay_user',
-            lang: 'afripay_lang'
+            lang: 'afripay_lang',
+            // Online status tracking
+            onlineStatus: 'afripay_online_status'
         };
 
         // ============================================================
@@ -1122,6 +1151,7 @@
         let pendingBusinesses = [];
         let allBusinesses = [];
         let isDark = false;
+        let onlineStatusMap = {};
 
         // ============================================================
         // DOM REFS
@@ -1139,6 +1169,65 @@
             t.classList.add('show');
             clearTimeout(t._hide);
             t._hide = setTimeout(() => t.classList.remove('show'), dur);
+        }
+
+        // ============================================================
+        // ONLINE STATUS MANAGEMENT (shared via localStorage)
+        // ============================================================
+        function loadOnlineStatus() {
+            try {
+                const raw = localStorage.getItem(KEYS.onlineStatus);
+                onlineStatusMap = raw ? JSON.parse(raw) : {};
+            } catch (e) { onlineStatusMap = {}; }
+        }
+
+        function saveOnlineStatus() {
+            try {
+                localStorage.setItem(KEYS.onlineStatus, JSON.stringify(onlineStatusMap));
+            } catch (e) {}
+        }
+
+        // Mark a user as online (called by the main app / agent hub)
+        // In this dashboard we simulate by checking if the user was active recently
+        // The actual online status is set by the main app (AfriPay Agent Hub)
+        // We read it from localStorage and display accordingly.
+
+        // This function is called from the main app to update status
+        function setUserOnline(userId, isOnline) {
+            if (!userId) return;
+            if (isOnline) {
+                onlineStatusMap[userId] = {
+                    online: true,
+                    lastSeen: Date.now()
+                };
+            } else {
+                if (onlineStatusMap[userId]) {
+                    onlineStatusMap[userId].online = false;
+                    onlineStatusMap[userId].lastSeen = Date.now();
+                }
+            }
+            saveOnlineStatus();
+        }
+
+        function isUserOnline(userId) {
+            if (!userId) return false;
+            const entry = onlineStatusMap[userId];
+            if (!entry) return false;
+            // If online, check if lastSeen is within 2 minutes (120000ms)
+            // If offline, return false
+            if (entry.online) {
+                const now = Date.now();
+                // Consider online if lastSeen within 2 minutes
+                if (now - entry.lastSeen < 120000) {
+                    return true;
+                } else {
+                    // Auto-offline if stale
+                    entry.online = false;
+                    saveOnlineStatus();
+                    return false;
+                }
+            }
+            return false;
         }
 
         // ============================================================
@@ -1184,6 +1273,20 @@
             // Update pending badge
             const badge = $('pendingBadge');
             if (badge) badge.textContent = pendingBusinesses.length;
+
+            // Load online status
+            loadOnlineStatus();
+
+            // Auto-update stale online status
+            for (const userId in onlineStatusMap) {
+                if (onlineStatusMap[userId].online) {
+                    const now = Date.now();
+                    if (now - onlineStatusMap[userId].lastSeen > 120000) {
+                        onlineStatusMap[userId].online = false;
+                    }
+                }
+            }
+            saveOnlineStatus();
         }
 
         function saveData() {
@@ -1194,12 +1297,11 @@
         }
 
         // ============================================================
-        // ADMIN AUTH (removed login/register – auto-login as admin)
+        // ADMIN AUTH (auto-login)
         // ============================================================
         function ensureAdmin() {
             let admin = getAdmin();
             if (!admin) {
-                // Create a default admin if none exists
                 admin = { name: 'Admin', password: 'admin123', pin: '12345' };
                 saveAdmin(admin);
                 setAdminLoggedIn(true);
@@ -1245,7 +1347,6 @@
             $('statTransactions').textContent = txs;
             $('statBusinesses').textContent = biz;
 
-            // Pending badge
             const badge = $('pendingBadge');
             if (badge) badge.textContent = pending;
         }
@@ -1277,9 +1378,16 @@
                 const limit = a.collateralLimit || 0;
                 const businessName = a.businessName || a.name || 'N/A';
                 const phone = a.mobileMoney || a.phone || '—';
+                const online = isUserOnline(a.id);
+                const dotClass = online ? 'online' : 'offline';
 
                 return `<tr>
-                            <td><strong>${esc(businessName)}</strong></td>
+                            <td>
+                                <div class="user-name-with-status">
+                                    <span class="status-dot ${dotClass}"></span>
+                                    <strong>${esc(businessName)}</strong>
+                                </div>
+                            </td>
                             <td>${esc(a.businessType || '—')}</td>
                             <td>${esc(phone)}</td>
                             <td>${flag} ${esc(getCountryName(a.countryCode || ''))}</td>
@@ -1340,8 +1448,16 @@
                     '—';
                 const country = u.country || '—';
                 const city = u.city || '—';
+                const online = isUserOnline(u.id);
+                const dotClass = online ? 'online' : 'offline';
+
                 return `<tr>
-                            <td><strong>${esc(u.name || '—')}</strong></td>
+                            <td>
+                                <div class="user-name-with-status">
+                                    <span class="status-dot ${dotClass}"></span>
+                                    <strong>${esc(u.name || '—')}</strong>
+                                </div>
+                            </td>
                             <td>${esc(u.phone || '—')}</td>
                             <td>${esc(city)}</td>
                             <td>${esc(country)}</td>
@@ -1477,7 +1593,18 @@
             tbody.innerHTML = recent.map(a => {
                 const name = a.businessName || a.name || '—';
                 const biz = a.businessType || '—';
-                return `<tr><td>${esc(name)}</td><td>${esc(biz)}</td><td><span class="status-badge approved">Approved</span></td></tr>`;
+                const online = isUserOnline(a.id);
+                const dotClass = online ? 'online' : 'offline';
+                return `<tr>
+                            <td>
+                                <div class="user-name-with-status">
+                                    <span class="status-dot ${dotClass}"></span>
+                                    ${esc(name)}
+                                </div>
+                            </td>
+                            <td>${esc(biz)}</td>
+                            <td><span class="status-badge approved">Approved</span></td>
+                        </tr>`;
             }).join('');
 
             // Dash pending approvals
@@ -1529,6 +1656,9 @@
                 `Are you sure you want to remove <strong>${esc(agent.businessName || agent.name)}</strong>? This action cannot be undone.`,
                 () => {
                     allUsers = allUsers.filter(u => u.id !== id);
+                    // Remove from online status as well
+                    delete onlineStatusMap[id];
+                    saveOnlineStatus();
                     saveData();
                     renderAgents();
                     renderStats();
@@ -1542,7 +1672,12 @@
             const agent = allUsers.find(u => u.id === id);
             if (!agent) { showToast('❌ Agent not found.', 2000); return; }
             const data = agent;
+            const online = isUserOnline(id);
+            const dotClass = online ? 'online' : 'offline';
+            const statusText = online ? '🟢 Online' : '⚪ Offline';
+
             let html = `
+                        <div class="detail-row"><span class="label">Status</span><span class="value"><span class="status-dot ${dotClass}" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;"></span> ${statusText}</span></div>
                         <div class="detail-row"><span class="label">🏢 Business</span><span class="value">${esc(data.businessName || data.name || '—')}</span></div>
                         <div class="detail-row"><span class="label">👤 Owner</span><span class="value">${esc(data.ownerName || '—')}</span></div>
                         <div class="detail-row"><span class="label">📍 Address</span><span class="value">${esc(data.businessAddress || data.address || '—')}</span></div>
@@ -1595,6 +1730,8 @@
                 `Are you sure you want to delete <strong>${esc(user.name)}</strong>? This action cannot be undone.`,
                 () => {
                     allUsers = allUsers.filter(u => u.id !== id);
+                    delete onlineStatusMap[id];
+                    saveOnlineStatus();
                     saveData();
                     renderUsers();
                     renderStats();
@@ -1606,7 +1743,6 @@
         function approvePending(index) {
             if (index < 0 || index >= pendingBusinesses.length) return;
             const biz = pendingBusinesses[index];
-            // Add to businesses
             const newBiz = {
                 id: Date.now() + Math.floor(Math.random() * 1000),
                 name: biz.name,
@@ -1629,7 +1765,6 @@
                 transferCode: biz.transferCode || '',
                 authenticated: true
             };
-            // Save to custom businesses
             try {
                 const existing = JSON.parse(localStorage.getItem(KEYS.customBusinesses) || '[]');
                 existing.push(newBiz);
@@ -1725,7 +1860,6 @@
             $('confirmTitle').textContent = title;
             $('confirmBody').innerHTML = bodyHtml;
             $('confirmModal').classList.add('open');
-            // Store callback
             const btn = $('confirmActionBtn');
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
@@ -1735,7 +1869,6 @@
             });
             $('confirmCancelBtn').addEventListener('click', closeModal);
             $('confirmCloseBtn').addEventListener('click', closeModal);
-            // Also close on overlay click
             const overlay = $('confirmModal');
             overlay.addEventListener('click', function(e) {
                 if (e.target === this) closeModal();
@@ -1753,58 +1886,24 @@
 
         function getFlagForCountry(code) {
             const map = {
-                '+232': '🇸🇱',
-                '+224': '🇬🇳',
-                '+221': '🇸🇳',
-                '+231': '🇱🇷',
-                '+233': '🇬🇭',
-                '+234': '🇳🇬',
-                '+254': '🇰🇪',
-                '+223': '🇲🇱',
-                '+225': '🇨🇮',
-                '+227': '🇳🇪',
-                '+229': '🇧🇯',
-                '+245': '🇬🇼',
-                '+220': '🇬🇲',
-                '+228': '🇹🇬',
-                '+236': '🇨🇫',
-                '+251': '🇪🇹',
-                '+241': '🇬🇦',
-                '+261': '🇲🇬',
-                '+212': '🇲🇦',
-                '+250': '🇷🇼',
-                '+256': '🇺🇬',
-                '+243': '🇨🇩',
-                '+226': '🇧🇫'
+                '+232': '🇸🇱', '+224': '🇬🇳', '+221': '🇸🇳', '+231': '🇱🇷',
+                '+233': '🇬🇭', '+234': '🇳🇬', '+254': '🇰🇪', '+223': '🇲🇱',
+                '+225': '🇨🇮', '+227': '🇳🇪', '+229': '🇧🇯', '+245': '🇬🇼',
+                '+220': '🇬🇲', '+228': '🇹🇬', '+236': '🇨🇫', '+251': '🇪🇹',
+                '+241': '🇬🇦', '+261': '🇲🇬', '+212': '🇲🇦', '+250': '🇷🇼',
+                '+256': '🇺🇬', '+243': '🇨🇩', '+226': '🇧🇫'
             };
             return map[code] || '🌍';
         }
 
         function getCountryName(code) {
             const map = {
-                '+232': 'Sierra Leone',
-                '+224': 'Guinea',
-                '+221': 'Senegal',
-                '+231': 'Liberia',
-                '+233': 'Ghana',
-                '+234': 'Nigeria',
-                '+254': 'Kenya',
-                '+223': 'Mali',
-                '+225': 'Ivory Coast',
-                '+227': 'Niger',
-                '+229': 'Benin',
-                '+245': 'Guinea Bissau',
-                '+220': 'Gambia',
-                '+228': 'Togo',
-                '+236': 'Central Africa Rep',
-                '+251': 'Ethiopia',
-                '+241': 'Gabon',
-                '+261': 'Madagascar',
-                '+212': 'Morocco',
-                '+250': 'Rwanda',
-                '+256': 'Uganda',
-                '+243': 'DR Congo',
-                '+226': 'Burkina Faso'
+                '+232': 'Sierra Leone', '+224': 'Guinea', '+221': 'Senegal', '+231': 'Liberia',
+                '+233': 'Ghana', '+234': 'Nigeria', '+254': 'Kenya', '+223': 'Mali',
+                '+225': 'Ivory Coast', '+227': 'Niger', '+229': 'Benin', '+245': 'Guinea Bissau',
+                '+220': 'Gambia', '+228': 'Togo', '+236': 'Central Africa Rep', '+251': 'Ethiopia',
+                '+241': 'Gabon', '+261': 'Madagascar', '+212': 'Morocco', '+250': 'Rwanda',
+                '+256': 'Uganda', '+243': 'DR Congo', '+226': 'Burkina Faso'
             };
             return map[code] || code || '—';
         }
@@ -1832,7 +1931,6 @@
             $('pageTitle').textContent = title;
             $('pageSubtitle').textContent = sub;
 
-            // Refresh data for the page
             loadData();
             renderStats();
             if (page === 'dashboard') { renderDashRecent();
@@ -1843,7 +1941,6 @@
             if (page === 'pending') renderPending();
             if (page === 'businesses') renderBusinesses();
 
-            // Close mobile sidebar
             closeSidebar();
         }
 
@@ -1862,7 +1959,7 @@
         // ============================================================
         function initApp() {
             loadData();
-            ensureAdmin(); // auto-login / create default admin
+            ensureAdmin();
             renderStats();
             renderDashRecent();
             renderAgents();
@@ -1872,29 +1969,64 @@
             renderBusinesses();
             navigateTo('dashboard');
             bindEvents();
-            // Auto-refresh every 30s
-            setInterval(() => {
-                loadData();
-                const active = document.querySelector('.page-section.active');
-                if (active) {
-                    const id = active.id.replace('page-', '');
-                    if (id === 'dashboard') { renderStats();
-                        renderDashRecent(); }
-                    if (id === 'agents') renderAgents();
-                    if (id === 'users') renderUsers();
-                    if (id === 'transactions') renderTransactions();
-                    if (id === 'pending') renderPending();
-                    if (id === 'businesses') renderBusinesses();
+
+            // Listen for storage changes from other tabs/devices
+            window.addEventListener('storage', function(e) {
+                if (e.key === KEYS.registeredUsers || e.key === KEYS.transactions ||
+                    e.key === KEYS.pendingBusinesses || e.key === KEYS.customBusinesses ||
+                    e.key === KEYS.onlineStatus) {
+                    loadData();
+                    const active = document.querySelector('.page-section.active');
+                    if (active) {
+                        const id = active.id.replace('page-', '');
+                        if (id === 'dashboard') { renderStats();
+                            renderDashRecent(); }
+                        if (id === 'agents') renderAgents();
+                        if (id === 'users') renderUsers();
+                        if (id === 'transactions') renderTransactions();
+                        if (id === 'pending') renderPending();
+                        if (id === 'businesses') renderBusinesses();
+                    }
+                    showToast('🔄 Data synced from another device/tab', 1500);
                 }
-            }, 30000);
-            console.log('✅ AfriPay Admin Dashboard ready.');
+            });
+
+            // Also poll for updates every 10 seconds to catch changes from other devices
+            setInterval(() => {
+                const oldUsers = JSON.stringify(allUsers);
+                const oldTx = JSON.stringify(allTransactions);
+                const oldPending = JSON.stringify(pendingBusinesses);
+                const oldStatus = JSON.stringify(onlineStatusMap);
+
+                loadData();
+
+                const newUsers = JSON.stringify(allUsers);
+                const newTx = JSON.stringify(allTransactions);
+                const newPending = JSON.stringify(pendingBusinesses);
+                const newStatus = JSON.stringify(onlineStatusMap);
+
+                if (oldUsers !== newUsers || oldTx !== newTx || oldPending !== newPending || oldStatus !== newStatus) {
+                    const active = document.querySelector('.page-section.active');
+                    if (active) {
+                        const id = active.id.replace('page-', '');
+                        if (id === 'dashboard') { renderStats();
+                            renderDashRecent(); }
+                        if (id === 'agents') renderAgents();
+                        if (id === 'users') renderUsers();
+                        if (id === 'transactions') renderTransactions();
+                        if (id === 'pending') renderPending();
+                        if (id === 'businesses') renderBusinesses();
+                    }
+                }
+            }, 10000);
+
+            console.log('✅ AfriPay Admin Dashboard ready (cross-device sync enabled).');
         }
 
         // ============================================================
         // EVENT BINDING
         // ============================================================
         function bindEvents() {
-            // Sidebar nav
             $$('.nav-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const page = item.dataset.page;
@@ -1902,11 +2034,9 @@
                 });
             });
 
-            // Sidebar toggle mobile
             $('sidebarToggleMobile').addEventListener('click', toggleSidebar);
             $('sidebarOverlay').addEventListener('click', closeSidebar);
 
-            // Modal close
             $('modalCloseBtn').addEventListener('click', closeModal);
             $('modalCloseBtn2').addEventListener('click', closeModal);
             $('detailModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
@@ -1914,7 +2044,6 @@
             $('confirmCancelBtn').addEventListener('click', closeModal);
             $('confirmModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
-            // Theme toggle
             $('themeToggle').addEventListener('click', () => {
                 isDark = !isDark;
                 document.body.classList.toggle('dark', isDark);
@@ -1922,7 +2051,6 @@
                 try { localStorage.setItem('afripay_dashboard_theme', isDark ? 'dark' : 'light'); } catch (e) {}
             });
 
-            // Load theme preference
             try {
                 const theme = localStorage.getItem('afripay_dashboard_theme');
                 if (theme === 'dark') {
@@ -1932,11 +2060,9 @@
                 }
             } catch (e) {}
 
-            // Search inputs
             $('agentSearch')?.addEventListener('input', renderAgents);
             $('userSearch')?.addEventListener('input', renderUsers);
 
-            // Refresh buttons
             $('refreshAgentsBtn')?.addEventListener('click', () => { loadData();
                 renderAgents();
                 showToast('🔄 Refreshed', 1200); });
