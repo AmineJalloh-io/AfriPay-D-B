@@ -875,6 +875,7 @@
                     <span style="font-size:0.7rem;opacity:0.6;">👑</span>
                     <span id="sidebarAdminName" style="font-weight:600;color:rgba(255,255,255,0.8);font-size:0.8rem;">Admin</span>
                 </div>
+                <button class="logout-btn" id="sidebarLogoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </aside>
 
@@ -1151,7 +1152,7 @@
         let allBusinesses = [];
         let isDark = false;
         let onlineStatusMap = {};
-        let registrationListenerActive = false;
+        let isPollingActive = false;
 
         // ============================================================
         // DOM REFS
@@ -1205,7 +1206,7 @@
         }
 
         // ============================================================
-        // DATA LOADERS
+        // DATA LOADERS – with deep merge to avoid overwriting
         // ============================================================
         function loadData() {
             try {
@@ -1921,17 +1922,17 @@
         }
 
         // ============================================================
-        // CROSS-DEVICE REGISTRATION CAPTURE
+        // CROSS-DEVICE REAL-TIME SYNC (FIXED)
         // ============================================================
-        function setupCrossDeviceListener() {
-            // Listen for storage events from other tabs/devices
+        function setupCrossDeviceSync() {
+            // 1. Listen for storage events (from other tabs/devices)
             window.addEventListener('storage', function(e) {
-                // Check if the change is related to user registrations
+                // Check if the change is relevant to our data
                 if (e.key === KEYS.registeredUsers || e.key === KEYS.transactions ||
                     e.key === KEYS.pendingBusinesses || e.key === KEYS.customBusinesses ||
                     e.key === KEYS.onlineStatus) {
 
-                    // Capture the previous state for comparison
+                    // Capture previous state for comparison
                     const oldUsers = JSON.stringify(allUsers);
                     const oldTx = JSON.stringify(allTransactions);
                     const oldPending = JSON.stringify(pendingBusinesses);
@@ -1945,17 +1946,19 @@
                     const newPending = JSON.stringify(pendingBusinesses);
                     const newStatus = JSON.stringify(onlineStatusMap);
 
-                    // Check if there was a new user or agent registration
+                    // Check for new registrations
                     if (oldUsers !== newUsers) {
-                        const addedUsers = allUsers.filter(u => {
-                            // Check if this user is new (not in old state)
+                        try {
                             const oldUserList = JSON.parse(oldUsers || '[]');
-                            return !oldUserList.some(o => o.id === u.id && o.name === u.name);
-                        });
-                        if (addedUsers.length > 0) {
-                            const names = addedUsers.map(u => u.businessName || u.name).join(', ');
-                            showToast(`🆕 New registration(s): ${names}`, 4000);
-                        }
+                            const newUserList = JSON.parse(newUsers || '[]');
+                            const added = newUserList.filter(u => {
+                                return !oldUserList.some(o => o.id === u.id && o.name === u.name);
+                            });
+                            if (added.length > 0) {
+                                const names = added.map(u => u.businessName || u.name).join(', ');
+                                showToast(`🆕 New registration(s): ${names}`, 4000);
+                            }
+                        } catch (err) {}
                     }
 
                     // Update the active page
@@ -1971,18 +1974,14 @@
                         if (id === 'businesses') renderBusinesses();
                     }
 
-                    // If there was any change, show a general sync notification (but don't spam)
-                    if (oldUsers !== newUsers || oldTx !== newTx || oldPending !== newPending || oldStatus !== newStatus) {
-                        // Only show if it wasn't a registration notification already
-                        if (oldUsers === newUsers) {
-                            showToast('🔄 Data synced from another device', 1500);
-                        }
+                    // General sync notification (if not a registration)
+                    if (oldUsers === newUsers) {
+                        showToast('🔄 Data synced from another device', 1500);
                     }
                 }
             });
 
-            // Also poll for updates every 3 seconds to catch changes from other devices
-            // that might not trigger the storage event (e.g., if the other tab is using a different storage key)
+            // 2. Aggressive polling for Opera Mini and other browsers that may not fire storage events reliably
             let lastKnownState = {
                 users: JSON.stringify(allUsers),
                 tx: JSON.stringify(allTransactions),
@@ -1990,32 +1989,38 @@
                 status: JSON.stringify(onlineStatusMap)
             };
 
+            // Poll every 1.5 seconds for faster sync
             setInterval(() => {
-                // Check for updates
+                // Reload fresh data
+                loadData();
+
                 const currentUsers = JSON.stringify(allUsers);
                 const currentTx = JSON.stringify(allTransactions);
                 const currentPending = JSON.stringify(pendingBusinesses);
                 const currentStatus = JSON.stringify(onlineStatusMap);
 
+                // Check if anything changed
                 if (currentUsers !== lastKnownState.users ||
                     currentTx !== lastKnownState.tx ||
                     currentPending !== lastKnownState.pending ||
                     currentStatus !== lastKnownState.status) {
 
-                    // Check if this was a new registration
+                    // Detect new registrations
                     if (currentUsers !== lastKnownState.users) {
-                        const oldUserList = JSON.parse(lastKnownState.users || '[]');
-                        const newUserList = JSON.parse(currentUsers || '[]');
-                        const addedUsers = newUserList.filter(u => {
-                            return !oldUserList.some(o => o.id === u.id && o.name === u.name);
-                        });
-                        if (addedUsers.length > 0) {
-                            const names = addedUsers.map(u => u.businessName || u.name).join(', ');
-                            showToast(`🆕 New registration(s): ${names}`, 4000);
-                        }
+                        try {
+                            const oldList = JSON.parse(lastKnownState.users || '[]');
+                            const newList = JSON.parse(currentUsers || '[]');
+                            const added = newList.filter(u => {
+                                return !oldList.some(o => o.id === u.id && o.name === u.name);
+                            });
+                            if (added.length > 0) {
+                                const names = added.map(u => u.businessName || u.name).join(', ');
+                                showToast(`🆕 New registration(s): ${names}`, 4000);
+                            }
+                        } catch (err) {}
                     }
 
-                    // Update the state
+                    // Update last known state
                     lastKnownState = {
                         users: currentUsers,
                         tx: currentTx,
@@ -2023,7 +2028,7 @@
                         status: currentStatus
                     };
 
-                    // Refresh the active page
+                    // Refresh active page
                     const active = document.querySelector('.page-section.active');
                     if (active) {
                         const id = active.id.replace('page-', '');
@@ -2036,7 +2041,7 @@
                         if (id === 'businesses') renderBusinesses();
                     }
                 }
-            }, 3000);
+            }, 1500); // 1.5 second polling interval for Opera Mini compatibility
         }
 
         // ============================================================
@@ -2055,10 +2060,10 @@
             navigateTo('dashboard');
             bindEvents();
 
-            // Setup cross-device registration listener
-            setupCrossDeviceListener();
+            // Setup cross-device sync
+            setupCrossDeviceSync();
 
-            console.log('✅ AfriPay Admin Dashboard ready (real-time cross-device registration capture enabled).');
+            console.log('✅ AfriPay Admin Dashboard ready (real-time cross-device sync enabled).');
         }
 
         // ============================================================
@@ -2113,6 +2118,14 @@
             $('refreshBizBtn')?.addEventListener('click', () => { loadData();
                 renderBusinesses();
                 showToast('🔄 Refreshed', 1200); });
+
+            // Logout
+            $('sidebarLogoutBtn').addEventListener('click', () => {
+                setAdminLoggedIn(false);
+                currentAdmin = null;
+                // Reload page to show login screen
+                location.reload();
+            });
         }
 
         // ============================================================
