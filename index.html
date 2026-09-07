@@ -71,156 +71,10 @@
         }
 
         /* ============================================================
-           LOGIN SCREEN
-           ============================================================ */
-        #loginScreen {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            width: 100%;
-            background: linear-gradient(145deg, #0a2b3c 0%, #1c4e6c 100%);
-            padding: 1rem;
-        }
-        #loginScreen .login-box {
-            background: white;
-            border-radius: var(--radius);
-            padding: 2rem 2rem 2.2rem;
-            max-width: 420px;
-            width: 100%;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
-        }
-        #loginScreen .login-box .logo {
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-        #loginScreen .login-box .logo h1 {
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #0a2b3c, #1c4e6c);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            letter-spacing: -0.5px;
-        }
-        #loginScreen .login-box .logo span {
-            color: var(--gold);
-        }
-        #loginScreen .login-box .logo small {
-            display: block;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            margin-top: 2px;
-        }
-        #loginScreen .input-group {
-            margin-bottom: 0.9rem;
-        }
-        #loginScreen .input-group label {
-            display: block;
-            font-weight: 600;
-            font-size: 0.8rem;
-            color: var(--text-primary);
-            margin-bottom: 4px;
-        }
-        #loginScreen .input-group input {
-            width: 100%;
-            padding: 10px 14px;
-            border-radius: 30px;
-            border: 1.5px solid var(--border-color);
-            font-size: 0.95rem;
-            outline: none;
-            transition: var(--transition);
-            background: #f8fafc;
-        }
-        #loginScreen .input-group input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(44, 125, 160, 0.15);
-            background: white;
-        }
-        #loginScreen .login-btn {
-            width: 100%;
-            padding: 11px;
-            border-radius: 30px;
-            background: var(--accent);
-            color: white;
-            font-weight: 700;
-            font-size: 1rem;
-            transition: var(--transition);
-            margin-top: 4px;
-        }
-        #loginScreen .login-btn:hover {
-            background: var(--accent-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(44, 125, 160, 0.3);
-        }
-        #loginScreen .auth-toggle {
-            text-align: center;
-            margin-top: 0.8rem;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        #loginScreen .auth-toggle a {
-            color: var(--accent);
-            font-weight: 600;
-            cursor: pointer;
-        }
-        #loginScreen .auth-toggle a:hover {
-            color: var(--orange);
-        }
-        #loginScreen .auth-error {
-            color: var(--red);
-            font-size: 0.8rem;
-            text-align: center;
-            margin-bottom: 0.6rem;
-            min-height: 1.4rem;
-        }
-        #loginScreen .auth-success {
-            color: var(--green);
-            font-size: 0.8rem;
-            text-align: center;
-            margin-bottom: 0.6rem;
-            min-height: 1.4rem;
-        }
-        .tab-row {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 1.2rem;
-            border-bottom: 2px solid var(--border-color);
-        }
-        .tab-row .tab-btn {
-            flex: 1;
-            padding: 8px 0;
-            background: transparent;
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            border-bottom: 3px solid transparent;
-            transition: var(--transition);
-        }
-        .tab-row .tab-btn.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-        .tab-row .tab-btn:hover {
-            color: var(--text-primary);
-        }
-        .form-panel {
-            display: none;
-        }
-        .form-panel.active {
-            display: block;
-            animation: fadeUp 0.3s ease;
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ============================================================
            SIDEBAR
            ============================================================ */
         #app {
-            display: none;
+            display: flex;
             width: 100%;
             min-height: 100vh;
         }
@@ -947,18 +801,6 @@
         body.dark .sidebar .nav-item.active {
             background: rgba(255, 215, 0, 0.08);
         }
-        body.dark #loginScreen .login-box {
-            background: #1a2a36;
-            color: var(--text-primary);
-        }
-        body.dark #loginScreen .input-group input {
-            background: #0f1f2a;
-            border-color: var(--border-color);
-            color: var(--text-primary);
-        }
-        body.dark #loginScreen .input-group input:focus {
-            background: #1a2a36;
-        }
         body.dark .modal-box {
             background: #1a2a36;
         }
@@ -977,68 +819,7 @@
 <body>
 
     <!-- ============================================================
-    LOGIN SCREEN
-    ============================================================ -->
-    <div id="loginScreen">
-        <div class="login-box">
-            <div class="logo">
-                <h1>Afri<span>Pay</span></h1>
-                <small>Admin Dashboard</small>
-            </div>
-            <div id="loginAuthError" class="auth-error"></div>
-            <div id="loginAuthSuccess" class="auth-success"></div>
-
-            <!-- Tabs -->
-            <div class="tab-row">
-                <button class="tab-btn" data-tab="loginTab">Login</button>
-                <button class="tab-btn active" data-tab="registerTab">Register</button>
-            </div>
-
-            <!-- Login Panel -->
-            <div class="form-panel" id="loginTab">
-                <div class="input-group">
-                    <label>Admin Name</label>
-                    <input type="text" id="loginName" placeholder="Enter admin name" />
-                </div>
-                <div class="input-group">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" placeholder="Enter password" />
-                </div>
-                <div class="input-group">
-                    <label>5-Digit PIN</label>
-                    <input type="password" id="loginPin" placeholder="Enter 5-digit PIN" maxlength="5" inputmode="numeric" />
-                </div>
-                <button class="login-btn" id="loginActionBtn">Login</button>
-            </div>
-
-            <!-- Register Panel -->
-            <div class="form-panel active" id="registerTab">
-                <div class="input-group">
-                    <label>Admin Name *</label>
-                    <input type="text" id="regName" placeholder="Choose a name" />
-                </div>
-                <div class="input-group">
-                    <label>Password *</label>
-                    <input type="password" id="regPassword" placeholder="Create a password" />
-                </div>
-                <div class="input-group">
-                    <label>Confirm Password *</label>
-                    <input type="password" id="regConfirmPassword" placeholder="Confirm password" />
-                </div>
-                <div class="input-group">
-                    <label>5-Digit PIN *</label>
-                    <input type="password" id="regPin" placeholder="Enter 5-digit PIN" maxlength="5" inputmode="numeric" />
-                </div>
-                <button class="login-btn" id="registerActionBtn">Register Admin</button>
-                <div style="text-align:center;margin-top:8px;font-size:0.75rem;color:var(--text-secondary);">
-                    <i class="fas fa-info-circle"></i> No admin account yet? Register now.
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================================
-    APP
+    APP (no login screen)
     ============================================================ -->
     <div id="app">
 
@@ -1067,7 +848,6 @@
                     <span style="font-size:0.7rem;opacity:0.6;">👑</span>
                     <span id="sidebarAdminName" style="font-weight:600;color:rgba(255,255,255,0.8);font-size:0.8rem;">Admin</span>
                 </div>
-                <button class="logout-btn" id="sidebarLogoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </aside>
 
@@ -1414,8 +1194,23 @@
         }
 
         // ============================================================
-        // ADMIN AUTH
+        // ADMIN AUTH (removed login/register – auto-login as admin)
         // ============================================================
+        function ensureAdmin() {
+            let admin = getAdmin();
+            if (!admin) {
+                // Create a default admin if none exists
+                admin = { name: 'Admin', password: 'admin123', pin: '12345' };
+                saveAdmin(admin);
+                setAdminLoggedIn(true);
+            }
+            if (!isAdminLoggedIn()) {
+                setAdminLoggedIn(true);
+            }
+            currentAdmin = admin;
+            $('sidebarAdminName').textContent = admin.name || 'Admin';
+        }
+
         function getAdmin() {
             try { return JSON.parse(localStorage.getItem(KEYS.admin)); } catch (e) { return null; }
         }
@@ -1430,40 +1225,6 @@
 
         function setAdminLoggedIn(status) {
             localStorage.setItem(KEYS.adminLoggedIn, status ? 'true' : 'false');
-        }
-
-        function loginAdmin(name, password, pin) {
-            const admin = getAdmin();
-            if (!admin) { showToast('❌ No admin account. Please register.', 2500); return false; }
-            if (name !== admin.name || password !== admin.password || pin !== admin.pin) {
-                showToast('❌ Invalid credentials.', 2500);
-                return false;
-            }
-            setAdminLoggedIn(true);
-            currentAdmin = admin;
-            return true;
-        }
-
-        function registerAdmin(name, password, confirm, pin) {
-            if (!name || !password || !confirm || !pin) {
-                showToast('❌ Fill all fields.', 2500);
-                return false;
-            }
-            if (password !== confirm) {
-                showToast('❌ Passwords do not match.', 2500);
-                return false;
-            }
-            if (pin.length !== 5 || !/^\d+$/.test(pin)) {
-                showToast('❌ PIN must be 5 digits.', 2500);
-                return false;
-            }
-            if (getAdmin()) {
-                showToast('❌ Admin already exists. Please login.', 2500);
-                return false;
-            }
-            saveAdmin({ name, password, pin });
-            showToast('✅ Admin registered! Please login.', 2500);
-            return true;
         }
 
         // ============================================================
@@ -2097,14 +1858,11 @@
         }
 
         // ============================================================
-        // AUTH UI
+        // INIT
         // ============================================================
-        function showApp() {
-            $('loginScreen').style.display = 'none';
-            $('app').style.display = 'flex';
-            const admin = getAdmin();
-            if (admin) $('sidebarAdminName').textContent = admin.name || 'Admin';
+        function initApp() {
             loadData();
+            ensureAdmin(); // auto-login / create default admin
             renderStats();
             renderDashRecent();
             renderAgents();
@@ -2113,107 +1871,29 @@
             renderPending();
             renderBusinesses();
             navigateTo('dashboard');
-        }
-
-        function logoutApp() {
-            setAdminLoggedIn(false);
-            currentAdmin = null;
-            $('app').style.display = 'none';
-            $('loginScreen').style.display = 'flex';
-            // Switch to register tab by default
-            switchTab('registerTab');
-            showToast('Logged out.', 1500);
-        }
-
-        // ============================================================
-        // TAB SWITCHING
-        // ============================================================
-        function switchTab(tabId) {
-            $$('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`.tab-btn[data-tab="${tabId}"]`)?.classList.add('active');
-            $$('.form-panel').forEach(p => p.classList.remove('active'));
-            const panel = $(tabId);
-            if (panel) panel.classList.add('active');
-            // Clear errors
-            $('loginAuthError').textContent = '';
-            $('loginAuthSuccess').textContent = '';
-        }
-
-        // ============================================================
-        // INIT AUTH
-        // ============================================================
-        function initAuth() {
-            // If admin exists and is logged in, go to app
-            if (isAdminLoggedIn() && getAdmin()) {
-                showApp();
-                return;
-            }
-            // Otherwise show login screen with register tab active
-            $('loginScreen').style.display = 'flex';
-            $('app').style.display = 'none';
-            switchTab('registerTab');
+            bindEvents();
+            // Auto-refresh every 30s
+            setInterval(() => {
+                loadData();
+                const active = document.querySelector('.page-section.active');
+                if (active) {
+                    const id = active.id.replace('page-', '');
+                    if (id === 'dashboard') { renderStats();
+                        renderDashRecent(); }
+                    if (id === 'agents') renderAgents();
+                    if (id === 'users') renderUsers();
+                    if (id === 'transactions') renderTransactions();
+                    if (id === 'pending') renderPending();
+                    if (id === 'businesses') renderBusinesses();
+                }
+            }, 30000);
+            console.log('✅ AfriPay Admin Dashboard ready.');
         }
 
         // ============================================================
         // EVENT BINDING
         // ============================================================
         function bindEvents() {
-            // Tab switching
-            $$('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tab = btn.dataset.tab;
-                    if (tab) switchTab(tab);
-                });
-            });
-
-            // Login
-            $('loginActionBtn').addEventListener('click', () => {
-                const name = $('loginName').value.trim();
-                const password = $('loginPassword').value.trim();
-                const pin = $('loginPin').value.trim();
-                if (!name || !password || !pin) {
-                    $('loginAuthError').textContent = '❌ Fill all fields.';
-                    return;
-                }
-                if (loginAdmin(name, password, pin)) {
-                    $('loginAuthError').textContent = '';
-                    showApp();
-                } else {
-                    $('loginAuthError').textContent = '❌ Invalid credentials.';
-                }
-            });
-
-            // Register
-            $('registerActionBtn').addEventListener('click', () => {
-                const name = $('regName').value.trim();
-                const password = $('regPassword').value.trim();
-                const confirm = $('regConfirmPassword').value.trim();
-                const pin = $('regPin').value.trim();
-                if (registerAdmin(name, password, confirm, pin)) {
-                    $('loginAuthError').textContent = '';
-                    $('loginAuthSuccess').textContent = '✅ Admin registered! Please login.';
-                    // Switch to login tab after short delay
-                    setTimeout(() => {
-                        switchTab('loginTab');
-                        $('loginAuthSuccess').textContent = '';
-                    }, 1500);
-                } else {
-                    $('loginAuthError').textContent = '❌ Registration failed.';
-                }
-            });
-
-            // Enter key support
-            const loginFields = ['loginName', 'loginPassword', 'loginPin'];
-            loginFields.forEach(id => {
-                $(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') $('loginActionBtn')
-                        .click(); });
-            });
-            const regFields = ['regName', 'regPassword', 'regConfirmPassword', 'regPin'];
-            regFields.forEach(id => {
-                $(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') $('registerActionBtn')
-                        .click(); });
-            });
-
             // Sidebar nav
             $$('.nav-item').forEach(item => {
                 item.addEventListener('click', () => {
@@ -2225,9 +1905,6 @@
             // Sidebar toggle mobile
             $('sidebarToggleMobile').addEventListener('click', toggleSidebar);
             $('sidebarOverlay').addEventListener('click', closeSidebar);
-
-            // Logout
-            $('sidebarLogoutBtn').addEventListener('click', logoutApp);
 
             // Modal close
             $('modalCloseBtn').addEventListener('click', closeModal);
@@ -2277,34 +1954,10 @@
         // ============================================================
         // BOOTSTRAP
         // ============================================================
-        function bootstrap() {
-            loadData();
-            initAuth();
-            bindEvents();
-            // Auto-refresh every 30s
-            setInterval(() => {
-                if (isAdminLoggedIn()) {
-                    loadData();
-                    const active = document.querySelector('.page-section.active');
-                    if (active) {
-                        const id = active.id.replace('page-', '');
-                        if (id === 'dashboard') { renderStats();
-                            renderDashRecent(); }
-                        if (id === 'agents') renderAgents();
-                        if (id === 'users') renderUsers();
-                        if (id === 'transactions') renderTransactions();
-                        if (id === 'pending') renderPending();
-                        if (id === 'businesses') renderBusinesses();
-                    }
-                }
-            }, 30000);
-            console.log('✅ AfriPay Admin Dashboard ready.');
-        }
-
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(bootstrap, 50);
+            setTimeout(initApp, 50);
         } else {
-            document.addEventListener('DOMContentLoaded', bootstrap);
+            document.addEventListener('DOMContentLoaded', initApp);
         }
     </script>
 
